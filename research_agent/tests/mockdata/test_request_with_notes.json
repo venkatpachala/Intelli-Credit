@@ -1,0 +1,35 @@
+{
+    "case_id": "CASE_2026_002",
+    "company_name": "Shree Ram Textiles Pvt Ltd",
+    "cin": "U17100MH2010PTC123456",
+    "gstin": "27AAACS1234A1Z5",
+    "pan": "AAACS1234A",
+    "promoters": [
+        {
+            "name": "Ramesh Kumar Agarwal",
+            "din": "01234567",
+            "designation": "Managing Director",
+            "shareholding_pct": 55.0,
+            "pan": null
+        }
+    ],
+    "loan": {
+        "amount": 100000000,
+        "purpose": "Working capital expansion",
+        "loan_type": "working_capital",
+        "tenor_months": 36
+    },
+    "qualitative_notes": [
+        {
+            "author": "Credit Officer - Rahul M.",
+            "date": "2026-03-01",
+            "content": "Visited the factory in Mumbai. Observed that the machinery is old and the plant is currently operating at 40% capacity. Management seemed slightly uncooperative."
+        },
+        {
+            "author": "Senior Analyst - Priya S.",
+            "date": "2026-03-02",
+            "content": "Despite low capacity, the company has a strong order book for the next two quarters."
+        }
+    ],
+    "ingestion_version": "UCES_v1"
+}

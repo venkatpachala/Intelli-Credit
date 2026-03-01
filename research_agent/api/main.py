@@ -4,7 +4,7 @@ api/main.py
 FastAPI application — single POST /research endpoint.
 
 Accepts a ResearchRequest JSON body (validated by Pydantic),
-builds EntityProfile, runs 5-source orchestrator,
+builds EntityProfile, runs 6-source orchestrator,
 and returns a ResearchOutput JSON.
 """
 
@@ -44,8 +44,8 @@ app = FastAPI(
     title="Research Agent — Credit Intelligence API",
     description=(
         "Automated KYC/due-diligence pipeline for Indian SME loan applicants. "
-        "Checks 5 regulatory/news sources: RBI defaulter list, MCA21, "
-        "eCourts, Tavily news, and GSTN."
+        "Checks 6 sources: RBI defaulter list, MCA21, "
+        "eCourts, Tavily news, GSTN, and internal Qualitative Notes."
     ),
     version=settings.app_version,
     lifespan=lifespan,
@@ -85,7 +85,7 @@ async def health():
 @app.post(
     "/research",
     tags=["Research"],
-    summary="Run full 5-source research on a loan applicant",
+    summary="Run full 6-source research on a loan applicant",
     response_description="ResearchOutput with risk score, flags, tags",
     status_code=status.HTTP_200_OK,
 )
@@ -94,12 +94,13 @@ async def research(payload: ResearchRequest):
     ### What this does
     1. Validates the input (CIN, GSTIN, PAN format + cross-field checks)
     2. Builds an `EntityProfile` from the request
-    3. Runs **5 sources concurrently**:
+    3. Runs **6 sources concurrently**:
        - RBI Wilful Defaulter List
        - MCA21 (charges, director history, ROC filings)
        - eCourts (litigation)
        - Tavily news (fraud/NPA signals)
        - GSTN (GST registration status)
+       - Primary Insights (Qualitative Notes evaluation)
     4. Scores and tags the aggregated findings
     5. Returns `ResearchOutput`
 

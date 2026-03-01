@@ -12,7 +12,7 @@ Responsibilities:
 
 from __future__ import annotations
 
-from core.entity_profile import EntityProfile, LoanProfile, PromoterProfile
+from core.entity_profile import EntityProfile, LoanProfile, PromoterProfile, QualitativeNoteProfile
 from core.input_contract import ResearchRequest
 
 # ── CIN State Code → City mapping ────────────────────────────
@@ -147,6 +147,15 @@ def build_entity_profile(request: ResearchRequest) -> EntityProfile:
         tenor_months=request.loan.tenor_months,
     )
 
+    notes = [
+        QualitativeNoteProfile(
+            author=n.author,
+            date=n.date,
+            content=n.content
+        )
+        for n in request.qualitative_notes
+    ]
+
     return EntityProfile(
         case_id=request.case_id,
         legal_name=request.company_name,
@@ -156,6 +165,7 @@ def build_entity_profile(request: ResearchRequest) -> EntityProfile:
         gstin=request.gstin,
         promoters=promoters,
         loan=loan,
+        qualitative_notes=notes,
         sector=sector,
         city=city,
         disambiguation_tokens=tokens,

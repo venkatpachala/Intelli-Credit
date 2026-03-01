@@ -14,6 +14,14 @@ from typing import List, Optional
 
 
 @dataclass
+class QualitativeNoteProfile:
+    """Qualitative notes from due diligence or site visits."""
+    author:  str
+    date:    str
+    content: str
+
+
+@dataclass
 class PromoterProfile:
     """A single director / promoter of the borrowing company."""
     name:             str
@@ -60,6 +68,7 @@ class EntityProfile:
     gstin:        str
     promoters:    List[PromoterProfile] = field(default_factory=list)
     loan:         LoanProfile           = field(default_factory=LoanProfile)
+    qualitative_notes: List[QualitativeNoteProfile] = field(default_factory=list)
     sector:       Optional[str]         = None
     city:         Optional[str]         = None
     disambiguation_tokens: List[str]    = field(default_factory=list)

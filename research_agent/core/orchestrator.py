@@ -1,7 +1,7 @@
 """
 core/orchestrator.py
 ====================
-Runs all 5 research sources concurrently (asyncio.gather),
+Runs all 6 research sources concurrently (asyncio.gather) including Primary Insights,
 collects flags + findings, passes them to tagger and scorer,
 and assembles the final ResearchOutput.
 """
@@ -25,6 +25,7 @@ from processing.tagger import assign_tags
 from sources.all_sources import (
     ECourtSource, GSTNSource, MCASource, NewsSource, RBISource,
 )
+from sources.internal_insights import PrimaryInsightSource
 
 logger   = structlog.get_logger(__name__)
 settings = get_settings()
@@ -56,8 +57,9 @@ async def run_research(
     ecourt_source = ECourtSource()
     news_source   = NewsSource()
     gstn_source   = GSTNSource()
+    insight_source = PrimaryInsightSource()
 
-    # ── Run all 5 concurrently ────────────────────────────────
+    # ── Run all 6 concurrently ────────────────────────────────
     results = await asyncio.gather(
         _run_source(
             name=DataSource.RBI,
@@ -78,6 +80,10 @@ async def run_research(
         _run_source(
             name=DataSource.GSTN,
             coro=gstn_source.fetch(entity),
+        ),
+        _run_source(
+            name=DataSource.INTERNAL,
+            coro=insight_source.analyze(entity),
         ),
         return_exceptions=False,   # individual source errors already handled inside
     )

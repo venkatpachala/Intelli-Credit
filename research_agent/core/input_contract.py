@@ -22,6 +22,11 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 # Sub-models
 # ─────────────────────────────────────────────────────────────
 
+class QualitativeNoteInput(BaseModel):
+    author:  str = Field(..., description="Name or role of the person providing the note, e.g., 'Credit Officer'")
+    date:    str = Field(..., description="Date of the observation (e.g. YYYY-MM-DD)")
+    content: str = Field(..., description="Free-text qualitative observation")
+
 class PromoterInput(BaseModel):
     name:             str   = Field(..., min_length=2,
                                     description="Full name of the promoter/director")
@@ -84,6 +89,8 @@ class ResearchRequest(BaseModel):
     promoters:         List[PromoterInput] = Field(..., min_length=1,
                                             description="At least one promoter required")
     loan:              LoanInput    = Field(..., description="Loan details block")
+    qualitative_notes: List[QualitativeNoteInput] = Field(default_factory=list,
+                                            description="Primary insights from site visits or management interviews")
     ingestion_version: str          = Field(...,
                                             description="Schema version, e.g. UCES_v1")
 
