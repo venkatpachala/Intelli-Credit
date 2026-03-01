@@ -1,0 +1,33 @@
+# Environment & secrets
+.env
+*.env.local
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+venv/
+.venv/
+
+# FAISS indexes
+*.faiss
+*.pkl
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Temp files
+extractor/_tmp_*/
+
+# Generated data
+output/
+extractor/input/
+extractor/output/*.json
+extractor/vectordb/faiss_store/

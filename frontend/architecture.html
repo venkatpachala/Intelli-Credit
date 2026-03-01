@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Intelli-Credit — System Architecture & Metrics</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0a0e1a;
+            --bg2: #111827;
+            --card: #1a2035;
+            --accent: #f59e0b;
+            --text: #f1f5f9;
+            --text2: #94a3b8;
+            --muted: #64748b;
+            --border: #1e293b;
+            --green: #10b981;
+            --red: #ef4444;
+            --gold: #c5a55a;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.7;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #1a237e, #0d1b5e);
+            border-bottom: 3px solid var(--gold);
+            padding: 12px 32px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .emblem {
+            width: 44px;
+            height: 44px;
+            background: var(--gold);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            font-weight: 800;
+            color: #1a237e;
+        }
+
+        .header h1 {
+            font-size: 17px;
+            font-weight: 700;
+            color: #fff;
+        }
+
+        .header p {
+            font-size: 10px;
+            color: var(--gold);
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            margin-top: 2px;
+        }
+
+        .back-btn {
+            margin-left: auto;
+            background: rgba(197, 165, 90, 0.12);
+            border: 1px solid var(--gold);
+            color: var(--gold);
+            font-size: 11px;
+            padding: 6px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-family: inherit;
+            text-decoration: none;
+            transition: all .2s;
+        }
+
+        .back-btn:hover {
+            background: rgba(197, 165, 90, 0.25);
+        }
+
+        .container {
+            max-width: 960px;
+            margin: 0 auto;
+            padding: 40px 24px 80px;
+        }
+
+        h2 {
+            font-size: 22px;
+            font-weight: 700;
+            margin: 40px 0 16px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid var(--accent);
+            color: var(--accent);
+        }
+
+        h3 {
+            font-size: 16px;
+            font-weight: 600;
+            margin: 28px 0 8px;
+            color: var(--text);
+        }
+
+        p {
+            font-size: 14px;
+            color: var(--text2);
+            margin-bottom: 12px;
+        }
+
+        /* Flow Diagram */
+        .flow {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin: 20px 0 30px;
+            padding: 20px;
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+        }
+
+        .flow-box {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 12px 16px;
+            text-align: center;
+            min-width: 140px;
+        }
+
+        .flow-box .icon {
+            font-size: 24px;
+            margin-bottom: 4px;
+        }
+
+        .flow-box .name {
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .flow-box .sub {
+            font-size: 9px;
+            color: var(--muted);
+            margin-top: 2px;
+        }
+
+        .flow-arrow {
+            font-size: 18px;
+            color: var(--accent);
+            font-weight: 700;
+        }
+
+        .flow-box.active {
+            border-color: var(--accent);
+            box-shadow: 0 0 12px rgba(245, 158, 11, 0.2);
+        }
+
+        /* Metric Tables */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 12px 0 20px;
+            font-size: 13px;
+        }
+
+        th {
+            background: var(--card);
+            border: 1px solid var(--border);
+            padding: 10px 12px;
+            text-align: left;
+            font-weight: 600;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: .5px;
+            color: var(--accent);
+        }
+
+        td {
+            border: 1px solid var(--border);
+            padding: 8px 12px;
+            color: var(--text2);
+        }
+
+        tr:hover td {
+            background: rgba(245, 158, 11, 0.03);
+        }
+
+        /* Formula Blocks */
+        .formula {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-left: 3px solid var(--accent);
+            border-radius: 6px;
+            padding: 12px 16px;
+            margin: 8px 0 16px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            color: var(--accent);
+        }
+
+        /* Severity Badges */
+        .sev {
+            display: inline-block;
+            font-size: 10px;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-weight: 600;
+        }
+
+        .sev-c {
+            background: rgba(239, 68, 68, 0.15);
+            color: var(--red);
+        }
+
+        .sev-h {
+            background: rgba(249, 115, 22, 0.15);
+            color: #f97316;
+        }
+
+        .sev-m {
+            background: rgba(245, 158, 11, 0.15);
+            color: var(--accent);
+        }
+
+        .sev-l {
+            background: rgba(16, 185, 129, 0.15);
+            color: var(--green);
+        }
+
+        /* Info boxes */
+        .info {
+            background: rgba(59, 130, 246, 0.08);
+            border: 1px solid rgba(59, 130, 246, 0.2);
+            border-radius: 8px;
+            padding: 12px 16px;
+            margin: 12px 0;
+            font-size: 12px;
+            color: #93c5fd;
+        }
+
+        .warn {
+            background: rgba(245, 158, 11, 0.08);
+            border: 1px solid rgba(245, 158, 11, 0.2);
+            border-radius: 8px;
+            padding: 12px 16px;
+            margin: 12px 0;
+            font-size: 12px;
+            color: var(--accent);
+        }
+
+        .layer-tag {
+            display: inline-block;
+            background: var(--accent);
+            color: #000;
+            font-size: 10px;
+            font-weight: 700;
+            padding: 3px 10px;
+            border-radius: 4px;
+            margin-bottom: 8px;
+            letter-spacing: .5px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="header">
+        <div class="emblem">IC</div>
+        <div>
+            <h1>System Architecture & Evaluation Metrics</h1>
+            <p>Mathematical Framework for Credit Risk Assessment</p>
+        </div>
+        <a class="back-btn" href="/">← Back to Appraisal</a>
+    </div>
+
+    <div class="container">
+
+        <!-- PIPELINE FLOW -->
+        <h2>Pipeline Architecture</h2>
+        <p>The system operates as a 6-step linear pipeline, processing raw documents into a structured credit risk
+            assessment with optional web intelligence enrichment.</p>
+
+        <div class="flow">
+            <div class="flow-box active">
+                <div class="icon">📄</div>
+                <div class="name">Document Upload</div>
+                <div class="sub">PDF, CSV, DOCX, TXT, JSON</div>
+            </div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box">
+                <div class="icon">🔍</div>
+                <div class="name">Format Detection</div>
+                <div class="sub">Magic bytes + extension</div>
+            </div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box">
+                <div class="icon">📝</div>
+                <div class="name">Text Extraction</div>
+                <div class="sub">pdfplumber / EasyOCR</div>
+            </div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box active">
+                <div class="icon">🧠</div>
+                <div class="name">LLM Structuring</div>
+                <div class="sub">Gemini 2.5 Pro</div>
+            </div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box">
+                <div class="icon">✅</div>
+                <div class="name">Cross-Validation</div>
+                <div class="sub">10 financial checks</div>
+            </div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-box active">
+                <div class="icon">📊</div>
+                <div class="name">Risk Scoring</div>
+                <div class="sub">0-10 scale output</div>
+            </div>
+        </div>
+
+        <div class="info">🔍 <strong>Optional Web Search Layer:</strong> When enabled, a parallel Research Agent
+            performs 6 DuckDuckGo queries (news, litigation, sector, promoter, regulatory) and merges findings into the
+            final JSON via the Synthesizer.</div>
+
+        <!-- LAYER 1 -->
+        <h2>Layer 1 — LLM Financial Extraction</h2>
+        <span class="layer-tag">GEMINI 2.5 PRO</span>
+        <p>The LLM reads extracted text and produces 12 structured JSON sections. Each financial metric is computed
+            using standard Indian banking formulas.</p>
+
+        <h3>Key Financial Metrics</h3>
+        <table>
+            <tr>
+                <th>Metric</th>
+                <th>Formula</th>
+                <th>Source</th>
+            </tr>
+            <tr>
+                <td>Revenue Growth</td>
+                <td><code>ΔR = (R<sub>t</sub> − R<sub>t-1</sub>) / R<sub>t-1</sub> × 100</code></td>
+                <td>Annual Report / P&L</td>
+            </tr>
+            <tr>
+                <td>EBITDA Margin</td>
+                <td><code>EBITDA / Revenue × 100</code></td>
+                <td>Annual Report</td>
+            </tr>
+            <tr>
+                <td>PAT Margin</td>
+                <td><code>Profit After Tax / Revenue × 100</code></td>
+                <td>P&L Statement</td>
+            </tr>
+            <tr>
+                <td>Debt-to-Equity</td>
+                <td><code>Total Debt / Shareholders' Equity</code></td>
+                <td>Balance Sheet</td>
+            </tr>
+            <tr>
+                <td>Interest Coverage (ICR)</td>
+                <td><code>EBITDA / Interest Expense</code></td>
+                <td>P&L Statement</td>
+            </tr>
+            <tr>
+                <td>Working Capital Cycle</td>
+                <td><code>Debtor Days + Inventory Days − Creditor Days</code></td>
+                <td>Balance Sheet + P&L</td>
+            </tr>
+            <tr>
+                <td>Free Cash Flow Margin</td>
+                <td><code>(Operating CF − CapEx) / Revenue × 100</code></td>
+                <td>Cash Flow Statement</td>
+            </tr>
+        </table>
+
+        <!-- LAYER 2 -->
+        <h2>Layer 2 — Cross-Validation Engine (10 Checks)</h2>
+        <p>Rule-based validation layer. Compares extracted figures against banking thresholds. Each check yields a
+            severity level and a PASS/FAIL/FLAG result.</p>
+
+        <h3>CV_001 — Interest Coverage Ratio</h3>
+        <div class="formula">ICR = EBITDA / Interest Expense</div>
+        <table>
+            <tr>
+                <th>Condition</th>
+                <th>Result</th>
+                <th>Severity</th>
+            </tr>
+            <tr>
+                <td>ICR ≥ 1.5x</td>
+                <td>PASS</td>
+                <td><span class="sev sev-l">LOW</span></td>
+            </tr>
+            <tr>
+                <td>ICR &lt; 1.5x</td>
+                <td>FAIL</td>
+                <td><span class="sev sev-h">HIGH</span></td>
+            </tr>
+        </table>
+        <div class="info">📌 RBI mandates ICR > 1.5x for term loans. ICR &lt; 1.0x means the company cannot cover
+            interest from operating profits.</div>
+
+        <h3>CV_002 — Gearing Ratio (Debt/Equity)</h3>
+        <div class="formula">Gearing = Total Debt / Shareholders' Equity</div>
+        <table>
+            <tr>
+                <th>Condition</th>
+                <th>Result</th>
+                <th>Severity</th>
+            </tr>
+            <tr>
+                <td>Gearing &lt; 1.0x</td>
+                <td>PASS</td>
+                <td><span class="sev sev-l">LOW</span></td>
+            </tr>
+            <tr>
+                <td>1.0x ≤ Gearing &lt; 2.0x</td>
+                <td>WARN</td>
+                <td><span class="sev sev-m">MEDIUM</span></td>
+            </tr>
+            <tr>
+                <td>Gearing ≥ 2.0x</td>
+                <td>FAIL</td>
+                <td><span class="sev sev-c">CRITICAL</span></td>
+            </tr>
+        </table>
+
+        <h3>CV_003 — PAT Margin</h3>
+        <div class="formula">PAT Margin = (Profit After Tax / Revenue) × 100</div>
+        <table>
+            <tr>
+                <th>Condition</th>
+                <th>Result</th>
+                <th>Severity</th>
+            </tr>
+            <tr>
+                <td>PAT Margin ≥ 2%</td>
+                <td>PASS</td>
+                <td><span class="sev sev-l">LOW</span></td>
+            </tr>
+            <tr>
+                <td>PAT Margin &lt; 2%</td>
+                <td>WARN</td>
+                <td><span class="sev sev-m">MEDIUM</span></td>
+            </tr>
+        </table>
+
+        <h3>CV_004 — Debt Trend</h3>
+        <div class="formula">Debt Trend% = ((Debt<sub>latest</sub> − Debt<sub>earliest</sub>) / Debt<sub>earliest</sub>)
+            × 100</div>
+        <table>
+            <tr>
+                <th>Condition</th>
+                <th>Result</th>
+                <th>Severity</th>
+            </tr>
+            <tr>
+                <td>Debt reduced &gt; 10%</td>
+                <td>PASS</td>
+                <td><span class="sev sev-l">LOW</span></td>
+            </tr>
+            <tr>
+                <td>Stable (±10%)</td>
+                <td>PASS</td>
+                <td><span class="sev sev-l">LOW</span></td>
+            </tr>
+            <tr>
+                <td>Grew 10–30%</td>
+                <td>WATCH</td>
+                <td><span class="sev sev-m">MEDIUM</span></td>
+            </tr>
+            <tr>
+                <td>Grew &gt; 30%</td>
+                <td>WARN</td>
+                <td><span class="sev sev-h">HIGH</span></td>
+            </tr>
+        </table>
+
+        <h3>CV_005 — Cash Trend</h3>
+        <div class="formula">Cash Trend% = ((Cash<sub>latest</sub> − Cash<sub>earliest</sub>) / Cash<sub>earliest</sub>)
+            × 100</div>
+        <table>
+            <tr>
+                <th>Condition</th>
+                <th>Result</th>
+                <th>Severity</th>
+            </tr>
+            <tr>
+                <td>Cash grew or stable</td>
+                <td>PASS</td>
+                <td><span class="sev sev-l">LOW</span></td>
+            </tr>
+            <tr>
+                <td>Declined 10–30%</td>
+                <td>WATCH</td>
+                <td><span class="sev sev-m">MEDIUM</span></td>
+            </tr>
+            <tr>
+                <td>Declined &gt; 30%</td>
+                <td>WARN — Liquidity Stress</td>
+                <td><span class="sev sev-h">HIGH</span></td>
+            </tr>
+        </table>
+
+        <h3>CV_006 — Revenue Consistency</h3>
+        <div class="formula">Revenue Growth% = ((Rev<sub>latest</sub> − Rev<sub>earliest</sub>) /
+            Rev<sub>earliest</sub>) × 100</div>
+        <table>
+            <tr>
+                <th>Condition</th>
+                <th>Result</th>
+                <th>Severity</th>
+            </tr>
+            <tr>
+                <td>-10% ≤ Δ ≤ 100%</td>
+                <td>PASS — Normal</td>
+                <td><span class="sev sev-l">LOW</span></td>
+            </tr>
+            <tr>
+                <td>Δ &gt; 100%</td>
+                <td>FLAG — Verify vs GST/bank</td>
+                <td><span class="sev sev-h">HIGH</span></td>
+            </tr>
+            <tr>
+                <td>Δ &lt; -30%</td>
+                <td>WARN — Investigate</td>
+                <td><span class="sev sev-h">HIGH</span></td>
+            </tr>
+        </table>
+        <div class="warn">⚠️ <strong>India-Specific:</strong> Revenue growth &gt; 100% in 2 years without corresponding
+            GST/bank data is a classic circular trading signal.</div>
+
+        <h3>CV_007 — Audit Qualifications</h3>
+        <div class="formula">IF audit_qualifications[] is NOT empty → FLAG (HIGH)</div>
+
+        <h3>CV_008 — Litigation Detection</h3>
+        <div class="formula">Keyword scan: ["litigation", "court", "ibc", "nclt", "insolvency", "cheque bounce"]</div>
+
+        <h3>CV_009 — GST vs Bank Statement (Circular Trading Detector) ⚠️</h3>
+        <div class="formula">Ratio = GST_Turnover / Bank_Credits<br>Mismatch% = (Ratio − 1) × 100</div>
+        <table>
+            <tr>
+                <th>Condition</th>
+                <th>Result</th>
+                <th>Severity</th>
+            </tr>
+            <tr>
+                <td>Ratio ≤ 1.1x</td>
+                <td>PASS</td>
+                <td><span class="sev sev-l">LOW</span></td>
+            </tr>
+            <tr>
+                <td>1.1x &lt; Ratio ≤ 1.3x</td>
+                <td>WARN — Minor Mismatch</td>
+                <td><span class="sev sev-m">MEDIUM</span></td>
+            </tr>
+            <tr>
+                <td>Ratio &gt; 1.3x</td>
+                <td>CRITICAL — Circular Trading</td>
+                <td><span class="sev sev-c">CRITICAL</span></td>
+            </tr>
+        </table>
+        <div class="warn">⚠️ This is the <strong>most powerful fraud detection check</strong>. If GST turnover exceeds
+            bank credits by &gt;30%, someone is generating fake invoices.</div>
+
+        <h3>CV_010 — ITC Ratio vs Sector Benchmark</h3>
+        <div class="formula">Actual ITC Ratio = ITC_Claimed / GST_Turnover<br>Deviation% = ((Actual − Benchmark) /
+            Benchmark) × 100</div>
+        <h3>Indian Sector Benchmarks</h3>
+        <table>
+            <tr>
+                <th>Sector</th>
+                <th>ITC Benchmark</th>
+                <th>Sector</th>
+                <th>ITC Benchmark</th>
+            </tr>
+            <tr>
+                <td>Trading</td>
+                <td>5%</td>
+                <td>Infrastructure</td>
+                <td>10%</td>
+            </tr>
+            <tr>
+                <td>Agriculture</td>
+                <td>6%</td>
+                <td>Textiles</td>
+                <td>10%</td>
+            </tr>
+            <tr>
+                <td>Logistics</td>
+                <td>7%</td>
+                <td>Steel & Metals</td>
+                <td>12%</td>
+            </tr>
+            <tr>
+                <td>Pharmaceuticals</td>
+                <td>9%</td>
+                <td>Real Estate</td>
+                <td>14%</td>
+            </tr>
+        </table>
+
+        <!-- LAYER 3 -->
+        <h2>Layer 3 — Risk Scoring Engine</h2>
+        <p>Each dimension is scored from <strong>0 (safest)</strong> to <strong>10 (riskiest)</strong>.</p>
+
+        <h3>Individual Scores</h3>
+        <div class="formula">Financial Risk Score (fallback) = min(Critical × 3 + High × 2 + Medium, 10)</div>
+
+        <h3>Overall Credit Score</h3>
+        <div class="formula">Overall = (Financial + Compliance + Management + Industry) / 4</div>
+
+        <h3>Risk Category Mapping</h3>
+        <table>
+            <tr>
+                <th>Score</th>
+                <th>Category</th>
+                <th>Interpretation</th>
+            </tr>
+            <tr>
+                <td>0.0 — 3.0</td>
+                <td><span class="sev sev-l">Low</span></td>
+                <td>Strong credit profile, minimal risk</td>
+            </tr>
+            <tr>
+                <td>3.1 — 5.0</td>
+                <td><span class="sev sev-m">Moderate</span></td>
+                <td>Acceptable with monitoring</td>
+            </tr>
+            <tr>
+                <td>5.1 — 7.0</td>
+                <td><span class="sev sev-h">High</span></td>
+                <td>Significant risk, enhanced due diligence required</td>
+            </tr>
+            <tr>
+                <td>7.1 — 10.0</td>
+                <td><span class="sev sev-c">Very High</span></td>
+                <td>Potential NPA, decline or restructure</td>
+            </tr>
+        </table>
+
+        <!-- LAYER 4 -->
+        <h2>Layer 4 — Research Agent</h2>
+        <span class="layer-tag">DUCKDUCKGO SEARCH</span>
+        <p>When web search is enabled, the agent runs 6 targeted queries and enriches the output using keyword-based
+            severity detection.</p>
+        <table>
+            <tr>
+                <th>Query Category</th>
+                <th>Search Template</th>
+                <th>Enriches</th>
+            </tr>
+            <tr>
+                <td>Negative News</td>
+                <td><code>{company} fraud scandal lawsuit</code></td>
+                <td>Industry Intel → negative_news</td>
+            </tr>
+            <tr>
+                <td>Positive News</td>
+                <td><code>{company} growth expansion revenue</code></td>
+                <td>Industry Intel → positive_news</td>
+            </tr>
+            <tr>
+                <td>Litigation</td>
+                <td><code>{company} NCLT IBC court case</code></td>
+                <td>Litigation Risk</td>
+            </tr>
+            <tr>
+                <td>Sector Outlook</td>
+                <td><code>{industry} sector outlook India 2025</code></td>
+                <td>Industry Intel → sector_outlook</td>
+            </tr>
+            <tr>
+                <td>Promoter Info</td>
+                <td><code>{company} promoter director board</code></td>
+                <td>Management Quality</td>
+            </tr>
+            <tr>
+                <td>Regulatory</td>
+                <td><code>{company} RBI SEBI regulatory</code></td>
+                <td>Compliance Risk</td>
+            </tr>
+        </table>
+
+        <!-- LAYER 5 -->
+        <h2>Layer 5 — FAISS Vector Database</h2>
+        <span class="layer-tag">PARALLEL INGESTION</span>
+        <table>
+            <tr>
+                <th>Parameter</th>
+                <th>Value</th>
+                <th>Rationale</th>
+            </tr>
+            <tr>
+                <td>Primary Embedder</td>
+                <td>Gemini <code>gemini-embedding-001</code></td>
+                <td>3072D — highest precision</td>
+            </tr>
+            <tr>
+                <td>Fallback Embedder</td>
+                <td>HuggingFace <code>BAAI/bge-large-en-v1.5</code></td>
+                <td>1024D — cost-effective</td>
+            </tr>
+            <tr>
+                <td>Similarity Metric</td>
+                <td>L2 (Euclidean Distance)</td>
+                <td><code>d(a,b) = √Σ(aᵢ − bᵢ)²</code></td>
+            </tr>
+            <tr>
+                <td>Chunk Size</td>
+                <td>1000 characters</td>
+                <td>~250 tokens per chunk</td>
+            </tr>
+            <tr>
+                <td>Chunk Overlap</td>
+                <td>200 characters (20%)</td>
+                <td>Cross-reference preservation</td>
+            </tr>
+        </table>
+        <div class="info">📌 Output JSON is automatically chunked, embedded, and stored in FAISS after every analysis —
+            enabling semantic retrieval for the Recommendation Engine.</div>
+
+    </div>
+</body>
+
+</html>
