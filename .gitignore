@@ -1,0 +1,61 @@
+# Virtual Environment (root and subdirectories)
+venv/
+**/venv/
+env/
+**/env/
+.venv/
+**/.venv/
+ENV/
+
+# Python cache
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+*.pyo
+*.pyd
+
+# Distribution / packaging
+.Python
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# pytest
+.pytest_cache/
+.coverage
+htmlcov/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Uploads & temp files
+uploads/
+tmp/
+temp/
+
+# Jupyter Notebook
+.ipynb_checkpoints/
+
+# mypy
+.mypy_cache/
+
+# Output files (generated data)
+extractor/output/
+
+# Environment files (contains secrets)
+.env
+**/.env
