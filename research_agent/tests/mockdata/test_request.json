@@ -1,0 +1,30 @@
+{
+    "case_id": "CASE_2026_001",
+    "company_name": "Shree Ram Textiles Pvt Ltd",
+    "cin": "U17100MH2010PTC123456",
+    "gstin": "27AAACS1234A1Z5",
+    "pan": "AAACS1234A",
+    "promoters": [
+        {
+            "name": "Ramesh Kumar Agarwal",
+            "din": "01234567",
+            "designation": "Managing Director",
+            "shareholding_pct": 55.0,
+            "pan": null
+        },
+        {
+            "name": "Suresh Kumar Agarwal",
+            "din": "01234568",
+            "designation": "Director",
+            "shareholding_pct": 30.0,
+            "pan": null
+        }
+    ],
+    "loan": {
+        "amount": 100000000,
+        "purpose": "Working capital expansion",
+        "loan_type": "working_capital",
+        "tenor_months": 36
+    },
+    "ingestion_version": "UCES_v1"
+}
