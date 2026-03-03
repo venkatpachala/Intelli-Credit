@@ -19,6 +19,14 @@ import os
 import sys
 from datetime import datetime
 
+# Load environment variables from .env file
+try:
+    from dotenv import load_dotenv
+    load_dotenv(os.path.join(os.path.dirname(__file__), '.env'))
+except ImportError:
+    pass  # dotenv not installed, rely on system env vars
+
+
 from core.detector    import detect_format
 from core.router      import route_to_extractor
 from core.llm         import LLMStructurer

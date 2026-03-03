@@ -79,6 +79,8 @@ class LLMStructurer:
     def __init__(self):
         self.anthropic_key = os.getenv("ANTHROPIC_API_KEY")
         self.openai_key    = os.getenv("OPENAI_API_KEY")
+        self.gemini_key    = os.getenv("GEMINI_API_KEY")
+        self.gemini_model  = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
         self.provider      = self._detect_provider()
         print(f"      [LLM] Provider: {self.provider}")
 
@@ -87,6 +89,8 @@ class LLMStructurer:
             return "anthropic"
         if self.openai_key:
             return "openai"
+        if self.gemini_key:
+            return "gemini"
         return "demo"  # No API key — use hardcoded demo data
 
     def extract(self, raw_texts: list, company_hint: str = None) -> dict:
@@ -108,6 +112,8 @@ class LLMStructurer:
 
         if self.provider == "anthropic":
             raw_response = self._call_anthropic(prompt)
+        elif self.provider == "gemini":
+            raw_response = self._call_gemini(prompt)
         else:
             raw_response = self._call_openai(prompt)
 
@@ -137,6 +143,24 @@ class LLMStructurer:
         )
         print(f"      [LLM] Document truncated from {len(full_text):,} to {max_chars:,} chars")
         return truncated
+
+    def _call_gemini(self, prompt: str) -> str:
+        """Calls Google Gemini API."""
+        try:
+            import google.generativeai as genai
+        except ImportError:
+            raise ImportError("google-generativeai not installed.\nRun: pip install google-generativeai")
+
+        genai.configure(api_key=self.gemini_key)
+        model    = genai.GenerativeModel(self.gemini_model)
+        response = model.generate_content(
+            prompt,
+            generation_config=genai.GenerationConfig(
+                temperature=0.1,
+                max_output_tokens=4096,
+            ),
+        )
+        return response.text
 
     def _call_anthropic(self, prompt: str) -> str:
         """Calls Anthropic Claude API."""
