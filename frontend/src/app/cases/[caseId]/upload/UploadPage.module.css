@@ -318,3 +318,204 @@
     align-items: center;
     padding-top: 8px;
 }
+
+/* Primary Insight Banner */
+.insightBanner {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    background: linear-gradient(135deg, rgba(66, 153, 225, 0.1), rgba(128, 90, 213, 0.1));
+    border: 1px solid rgba(99, 179, 237, 0.25);
+    border-radius: 12px;
+    padding: 14px 18px;
+    margin-bottom: 20px;
+}
+
+.insightBannerIcon {
+    font-size: 1.5rem;
+    flex-shrink: 0;
+}
+
+.insightBannerText {
+    flex: 1;
+    font-size: 13px;
+    color: #a0aec0;
+    line-height: 1.5;
+}
+
+.insightBannerText strong {
+    color: #e2e8f0;
+}
+
+.insightBannerBtn {
+    font-size: 13px;
+    font-weight: 700;
+    color: #63b3ed;
+    background: rgba(66, 153, 225, 0.12);
+    border: 1px solid rgba(66, 153, 225, 0.3);
+    border-radius: 8px;
+    padding: 8px 14px;
+    text-decoration: none;
+    white-space: nowrap;
+    transition: all 0.2s;
+}
+
+.insightBannerBtn:hover {
+    background: rgba(66, 153, 225, 0.22);
+    color: #90cdf4;
+}
+
+/* Progress card (updated classname) */
+.progressCard {
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    padding: 16px 20px;
+    margin-bottom: 24px;
+}
+
+.allDoneBanner {
+    margin-top: 8px;
+    font-size: 12px;
+    color: #68d391;
+    font-weight: 600;
+}
+
+/* Upload progress */
+.uploadProgress {
+    position: relative;
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    height: 40px;
+    overflow: hidden;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    padding: 0 14px;
+}
+
+.uploadBar {
+    position: absolute;
+    left: 0;
+    top: 0;
+    height: 100%;
+    background: linear-gradient(90deg, #4299e1, #805ad5);
+    transition: width 0.4s ease;
+    opacity: 0.4;
+}
+
+.uploadText {
+    position: relative;
+    z-index: 1;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+/* reqTag / optTag */
+.reqTag {
+    font-size: 10px;
+    font-weight: 700;
+    color: #f6ad55;
+    background: rgba(237, 137, 54, 0.1);
+    border: 1px solid rgba(237, 137, 54, 0.4);
+    padding: 1px 6px;
+    border-radius: 3px;
+    letter-spacing: 0.5px;
+    margin-left: 4px;
+}
+
+.optTag {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-weight: 400;
+    letter-spacing: 0;
+    text-transform: none;
+}
+
+/* Doc slot sub-elements */
+.docLeft {
+    display: flex;
+    gap: 12px;
+    flex: 1;
+    min-width: 0;
+}
+
+.docHint {
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+/* Optional grid */
+.optGrid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+}
+
+.optSlot {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-subtle);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.optSlot:hover {
+    background: var(--bg-elevated);
+}
+
+.optCircle {
+    font-size: 14px;
+    flex-shrink: 0;
+}
+
+.optLabel {
+    flex: 1;
+    font-size: 13px;
+    color: var(--text-secondary);
+}
+
+.optUpload {
+    font-size: 12px;
+    color: var(--accent-blue-bright);
+}
+
+.dropActive {
+    border-color: var(--accent-blue) !important;
+    background: rgba(77, 143, 204, 0.1) !important;
+}
+
+.dropIcon {
+    font-size: 1.5rem;
+}
+
+.dropText {
+    font-size: 13px;
+    color: var(--text-muted);
+}
+
+.fileList {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.fileName {
+    font-size: 12px;
+    background: var(--bg-elevated);
+    padding: 2px 8px;
+    border-radius: 4px;
+    color: var(--text-secondary);
+}
+
+.caseLabel {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-bottom: 2px;
+}

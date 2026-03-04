@@ -699,3 +699,164 @@ class GSTNSource:
 
     async def close(self):
         await self._http.aclose()
+
+
+# ═════════════════════════════════════════════════════════════
+# SOURCE 6 — CIBIL Commercial (India's Credit Bureau)
+# Structured integration — real API requires CIBIL licensing.
+# ═════════════════════════════════════════════════════════════
+
+class CIBILSource:
+    """
+    Checks CIBIL Commercial bureau for:
+      - Company commercial credit score (300–900)
+      - Days Past Due (DPD) with existing lenders
+      - Overdue / NPA signals
+      - Credit enquiry count (funding stress indicator)
+      - Promoter retail CIBIL scores
+
+    Production: integrate with CIBIL C-MAP API (TransUnion CIBIL Ltd.)
+    Current: structured deterministic mock for demo and architecture validation.
+    """
+
+    _log = structlog.get_logger("CIBILSource")
+
+    async def check(self, entity: EntityProfile) -> SourceOutput:
+        log = self._log.bind(case_id=entity.case_id, source="cibil")
+        log.info("started")
+
+        flags:    List[ResearchFlag] = []
+        findings: List[dict]         = []
+
+        try:
+            pan      = entity.pan or "AAAAA0000A"
+            pan_hash = int(hashlib.md5(pan.encode()).hexdigest(), 16)
+
+            # Deterministic score 600–850 from PAN hash (demo)
+            commercial_score = min(850, max(300, 600 + (pan_hash % 251)))
+            dpd_months       = pan_hash % 5          # 0–4 months DPD
+            overdue_flag     = dpd_months >= 3
+            enquiries_6m     = pan_hash % 8          # 0–7 enquiries
+
+            findings.append({
+                "source":              "CIBIL Commercial Bureau (C-MAP)",
+                "note":                "Simulated — CIBIL API license required for live data",
+                "commercial_score":    commercial_score,
+                "score_band":          _cibil_band(commercial_score),
+                "dpd_months":          dpd_months,
+                "overdue":             overdue_flag,
+                "credit_enquiries_6m": enquiries_6m,
+                "pan_checked":         pan,
+            })
+
+            # Promoter retail bureau scores
+            for p in entity.promoters[:3]:
+                p_hash  = int(hashlib.md5((p.pan or "AAAAA0000A").encode()).hexdigest(), 16)
+                p_score = min(900, max(300, 600 + (p_hash % 301)))
+                findings.append({
+                    "source":   "CIBIL Retail Bureau",
+                    "promoter": p.name,
+                    "score":    p_score,
+                    "band":     _cibil_band(p_score),
+                    "pan":      p.pan,
+                })
+                if p_score < 650:
+                    flags.append(ResearchFlag(
+                        flag_id=_flag_id(),
+                        severity=Severity.MEDIUM,
+                        category=FlagCategory.PROMOTER,
+                        source=DataSource.CIBIL,
+                        title=f"Low Retail CIBIL Score — Promoter {p.name}",
+                        description=(
+                            f"Promoter {p.name} CIBIL retail score {p_score} "
+                            f"(below recommended threshold 700). May indicate personal credit stress."
+                        ),
+                        score_impact=-10,
+                        requires_verification=True,
+                    ))
+
+            # Company commercial score flags
+            if commercial_score < 600:
+                flags.append(ResearchFlag(
+                    flag_id=_flag_id(),
+                    severity=Severity.HIGH,
+                    category=FlagCategory.FINANCIAL,
+                    source=DataSource.CIBIL,
+                    title="Poor CIBIL Commercial Score",
+                    description=(
+                        f"CIBIL commercial score {commercial_score} — below 600 indicates "
+                        f"poor repayment history. Obtain full C-MAP report before proceeding."
+                    ),
+                    score_impact=-25,
+                    requires_verification=True,
+                ))
+            elif commercial_score < 700:
+                flags.append(ResearchFlag(
+                    flag_id=_flag_id(),
+                    severity=Severity.MEDIUM,
+                    category=FlagCategory.FINANCIAL,
+                    source=DataSource.CIBIL,
+                    title="Below-Average CIBIL Commercial Score",
+                    description=(
+                        f"CIBIL score {commercial_score} (600–700 range). "
+                        f"Acceptable but below strong tier — monitor track record closely."
+                    ),
+                    score_impact=-8,
+                ))
+
+            if overdue_flag:
+                flags.append(ResearchFlag(
+                    flag_id=_flag_id(),
+                    severity=Severity.HIGH,
+                    category=FlagCategory.FINANCIAL,
+                    source=DataSource.CIBIL,
+                    title="Days Past Due — Overdue with Existing Lender(s)",
+                    description=(
+                        f"Company shows {dpd_months} month(s) past due. "
+                        f"Current repayment stress indicator — requires enhanced due diligence."
+                    ),
+                    score_impact=-20,
+                    requires_verification=True,
+                ))
+
+            if enquiries_6m >= 5:
+                flags.append(ResearchFlag(
+                    flag_id=_flag_id(),
+                    severity=Severity.MEDIUM,
+                    category=FlagCategory.FINANCIAL,
+                    source=DataSource.CIBIL,
+                    title="High Credit Enquiry Count",
+                    description=(
+                        f"{enquiries_6m} credit enquiries in last 6 months — "
+                        f"may indicate funding stress or multiple simultaneous applications."
+                    ),
+                    score_impact=-5,
+                ))
+
+            if not flags and commercial_score >= 750:
+                findings.append({
+                    "type": "positive",
+                    "text": f"Strong CIBIL commercial score {commercial_score} ({_cibil_band(commercial_score)}) — clean bureau record."
+                })
+
+            log.info("complete", commercial_score=commercial_score, flags=len(flags))
+            return flags, findings, {
+                "commercial_score": commercial_score,
+                "dpd_months":       dpd_months,
+                "overdue":          overdue_flag,
+                "enquiries_6m":     enquiries_6m,
+                "note":             "Simulated — requires CIBIL API license for production",
+            }
+
+        except Exception as e:
+            log.error("cibil_error", error=str(e))
+            return [], [], {"error": str(e)}
+
+
+def _cibil_band(score: int) -> str:
+    if score >= 800: return "Excellent"
+    if score >= 750: return "Very Good"
+    if score >= 700: return "Good"
+    if score >= 650: return "Fair"
+    if score >= 600: return "Below Average"
+    return "Poor"

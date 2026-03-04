@@ -6,6 +6,7 @@ Detects:
     - Circular trading (GST turnover vs bank credits mismatch)
     - Revenue inflation (abnormal growth)
     - Fabricated ITC claims (ITC vs sector benchmark)
+    - GSTR-2A vs GSTR-3B ITC reconciliation (India-specific)
     - Leverage issues (gearing, interest coverage)
     - Audit qualifications and litigation flags
     - Cash and debt trends
@@ -14,9 +15,9 @@ Detects:
 
 class CrossValidator:
     """
-    Runs 10 validation checks on the structured extracted data.
+    Runs 11 validation checks on the structured extracted data.
     Each check returns a dict:
-        check_id    : str   — CV_001 through CV_010
+        check_id    : str   — CV_001 through CV_011
         description : str   — human readable name
         result      : str   — starts with PASS / FAIL / FLAG / WARN / SKIP / ERROR
         severity    : str   — CRITICAL / HIGH / MEDIUM / LOW
@@ -40,7 +41,7 @@ class CrossValidator:
 
     def run(self, structured: dict) -> list:
         """
-        Runs all 10 validation checks.
+        Runs all 11 validation checks.
         Returns a flat list of check result dicts.
         """
         fields  = structured.get("fields", structured)
@@ -56,6 +57,7 @@ class CrossValidator:
         results += self._check_litigation(fields)
         results += self._check_gst_bank_mismatch(fields)
         results += self._check_itc_ratio(fields)
+        results += self._check_gstr2a_3b_reconciliation(fields)  # CV_011 India-specific
 
         return results
 
@@ -449,6 +451,105 @@ class CrossValidator:
             return [self._error("CV_010", "ITC ratio check")]
 
     # ─────────────────────────────────────────────────────────
+    # CV_011 — GSTR-2A vs GSTR-3B ITC Reconciliation
+    # INDIA-SPECIFIC: The most nuanced GST fraud check
+    # ─────────────────────────────────────────────────────────
+    def _check_gstr2a_3b_reconciliation(self, fields: dict) -> list:
+        """
+        GSTR-2A = auto-populated purchase register from supplier filings.
+        GSTR-3B = self-declared summary return filed by the borrower.
+
+        If the borrower claims ITC in GSTR-3B that is HIGHER than what appears
+        in GSTR-2A (auto-populated from suppliers), it means they are claiming
+        input credits for purchases that never actually happened.
+
+        This is India's most common GST fraud mechanism.
+
+        Trigger: Only runs if gstr2a_itc and gstr3b_itc are both available.
+        Data sources: GSTR-2A export CSV + GSTR-3B export CSV (uploaded together).
+        """
+        try:
+            gst  = fields.get("gst_data", {})
+
+            # Try direct fields first
+            gstr2a_itc = self._safe_num(fields.get("gstr2a_itc") or gst.get("gstr2a_itc"))
+            gstr3b_itc = self._safe_num(fields.get("gstr3b_itc") or gst.get("gstr3b_itc"))
+
+            # Also try variance_pct if already computed
+            variance_pct = self._safe_num(gst.get("gstr2a_variance_pct"))
+
+            if gstr2a_itc <= 0 and gstr3b_itc <= 0 and variance_pct < 0:
+                return [{
+                    "check_id":    "CV_011",
+                    "description": "GSTR-2A vs GSTR-3B ITC Reconciliation (India-Specific Fraud Check)",
+                    "result":      (
+                        "SKIP — Upload BOTH GSTR-2A (purchase register) and GSTR-3B "
+                        "(summary return) CSV exports to run this India-specific check."
+                    ),
+                    "severity":    "LOW",
+                    "tip": (
+                        "GSTR-2A is auto-populated from suppliers and cannot be falsified. "
+                        "If GSTR-3B ITC > GSTR-2A ITC by >10%, it indicates non-existent purchase credits."
+                    ),
+                }]
+
+            # Compute from raw ITC values if available
+            if gstr2a_itc > 0 and gstr3b_itc > 0:
+                excess_itc = gstr3b_itc - gstr2a_itc
+                variance_pct = round((excess_itc / gstr2a_itc) * 100, 1) if gstr2a_itc > 0 else 0
+
+            # Now evaluate
+            if variance_pct > 20:
+                return [{
+                    "check_id":      "CV_011",
+                    "description":   "GSTR-2A vs GSTR-3B ITC Reconciliation",
+                    "result": (
+                        f"CRITICAL FLAG — GSTR-3B ITC is {variance_pct:.1f}% higher than GSTR-2A. "
+                        f"Borrower is claiming ₹{excess_itc:,.0f} of unverifiable input credits. "
+                        f"This is a strong indicator of fabricated purchase invoices (bogus ITC)."
+                    ),
+                    "severity":      "CRITICAL",
+                    "gstr2a_itc":    gstr2a_itc,
+                    "gstr3b_itc":    gstr3b_itc,
+                    "variance_pct":  variance_pct,
+                    "excess_itc":    excess_itc,
+                }]
+            elif variance_pct > 10:
+                return [{
+                    "check_id":     "CV_011",
+                    "description":  "GSTR-2A vs GSTR-3B ITC Reconciliation",
+                    "result": (
+                        f"FLAG — GSTR-3B ITC is {variance_pct:.1f}% above GSTR-2A. "
+                        f"ITC gap could indicate timing differences OR unverified credits — verify with CA."
+                    ),
+                    "severity":     "HIGH",
+                    "variance_pct": variance_pct,
+                }]
+            elif variance_pct > 5:
+                return [{
+                    "check_id":     "CV_011",
+                    "description":  "GSTR-2A vs GSTR-3B ITC Reconciliation",
+                    "result":       f"WARN — ITC variance {variance_pct:.1f}% — acceptable but monitor",
+                    "severity":     "MEDIUM",
+                    "variance_pct": variance_pct,
+                }]
+            else:
+                return [{
+                    "check_id":     "CV_011",
+                    "description":  "GSTR-2A vs GSTR-3B ITC Reconciliation",
+                    "result": (
+                        f"PASS — ITC reconciliation variance {variance_pct:.1f}% "
+                        f"(GSTR-3B closely matches GSTR-2A — authentic transactions)"
+                    ),
+                    "severity":     "LOW",
+                    "variance_pct": variance_pct,
+                }]
+
+        except Exception as e:
+            return [self._error("CV_011", "GSTR-2A vs GSTR-3B reconciliation")]
+
+
+    # ─────────────────────────────────────────────────────────
     # Helper methods
     # ─────────────────────────────────────────────────────────
 
@@ -457,10 +558,8 @@ class CrossValidator:
         if isinstance(data, (int, float)):
             return data
         if isinstance(data, dict):
-            # Check for direct 'value' key
             if "value" in data:
                 return data["value"]
-            # Look for period-keyed values — return last one
             numbers = [
                 v for v in data.values()
                 if isinstance(v, (int, float)) and not isinstance(v, bool)
@@ -480,6 +579,18 @@ class CrossValidator:
             ]
             return numbers
         return []
+
+    def _safe_num(self, val) -> float:
+        """Safely converts a value to float, returning -1 on failure."""
+        if val is None:
+            return -1.0
+        if isinstance(val, dict):
+            val = val.get("value", -1)
+        try:
+            result = float(val)
+            return result if result >= 0 else -1.0
+        except (TypeError, ValueError):
+            return -1.0
 
     def _not_found(self, check_id: str, field: str) -> dict:
         """Returns a SKIP result when required data is not in the extracted fields."""

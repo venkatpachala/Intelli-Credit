@@ -1,0 +1,1 @@
+"""Narrative sub-package."""

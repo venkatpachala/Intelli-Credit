@@ -40,7 +40,7 @@ from fastapi import (
     status,
 )
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, EmailStr
 
@@ -55,9 +55,12 @@ BASE_DIR         = Path(__file__).parent
 DB_PATH          = BASE_DIR / "data.db"
 UPLOADS_DIR      = BASE_DIR / "uploads"
 EXTRACTOR_DIR    = BASE_DIR.parent / "extractor"
+CAM_ENGINE_DIR   = BASE_DIR.parent / "cam_engine"
+CAM_OUTPUT_DIR   = BASE_DIR / "cam_output"
 RESEARCH_URL     = os.getenv("RESEARCH_AGENT_URL", "http://localhost:8001/research")
 
 UPLOADS_DIR.mkdir(exist_ok=True)
+CAM_OUTPUT_DIR.mkdir(exist_ok=True)
 
 # ── Database ──────────────────────────────────────────────────
 
@@ -103,6 +106,8 @@ def init_db():
             extraction_result TEXT,
             research_result   TEXT,
             cam_json          TEXT,
+            cam_docx_path     TEXT,
+            cam_pdf_path      TEXT,
             approver_decision TEXT,
             approver_comments TEXT,
             created_at      TEXT NOT NULL,
@@ -120,7 +125,17 @@ def init_db():
             FOREIGN KEY(case_id) REFERENCES cases(id)
         );
     """)
-    conn.commit()
+    # Add new columns to existing databases (idempotent)
+    for col, ctype in [
+        ("cam_docx_path",   "TEXT"),
+        ("cam_pdf_path",    "TEXT"),
+        ("qualitative_json","TEXT"),
+    ]:
+        try:
+            conn.execute(f"ALTER TABLE cases ADD COLUMN {col} {ctype}")
+            conn.commit()
+        except Exception:
+            pass   # Column already exists
     conn.close()
 
 
@@ -200,6 +215,18 @@ class ReviewRequest(BaseModel):
     modified_rate: Optional[float] = None
     conditions: Optional[str] = None
     comments: str
+
+
+class PrimaryInsightRequest(BaseModel):
+    """Credit officer field observation inputs — adjusts the composite score."""
+    factory_visit_date:   Optional[str]   = None    # ISO date string
+    factory_capacity_pct: Optional[float] = None    # 0-100 %
+    management_quality:   Optional[int]   = None    # 1-5
+    site_condition:       Optional[str]   = None    # excellent/good/average/poor/critical
+    key_person_risk:      Optional[bool]  = None
+    supply_chain_risk:    Optional[bool]  = None
+    cibil_commercial_score: Optional[float] = None  # 300-900
+    notes:                Optional[str]   = None    # free text observations
 
 
 # ── App ───────────────────────────────────────────────────────
@@ -302,16 +329,49 @@ def run_pipeline_bg(case_id: str, upload_folder: str, company_name: str, researc
 
         update_case_field(case_id, research_result=json.dumps(research_data), pipeline_stage="generating_cam")
 
-        # STAGE 3: GENERATE CAM
-        log_stage(case_id, "cam_generation", "running", "Generating Credit Appraisal Memorandum...")
-        cam = build_cam(case_id, extraction_data, research_data, research_payload)
-        update_case_field(
-            case_id,
-            cam_json=json.dumps(cam),
-            pipeline_stage="complete",
-            status="cam_ready",
-        )
-        log_stage(case_id, "cam_generation", "complete", f"CAM generated. Decision: {cam.get('decision')}")
+        # STAGE 3: PILLAR 3 — CAM ENGINE
+        log_stage(case_id, "cam_generation", "running", "Running Pillar 3 CAM engine (scoring + narratives + DOCX)...")
+        try:
+            # Add cam_engine to path so sub-modules resolve correctly
+            cam_engine_path = str(CAM_ENGINE_DIR)
+            if cam_engine_path not in sys.path:
+                sys.path.insert(0, cam_engine_path)
+
+            from main import generate_cam  # cam_engine/main.py
+            case_output_dir = str(CAM_OUTPUT_DIR / case_id)
+
+            cam = generate_cam(
+                case_id    = case_id,
+                extraction = extraction_data,
+                research   = research_data,
+                req        = research_payload,
+                output_dir = case_output_dir,
+            )
+
+            update_case_field(
+                case_id,
+                cam_json      = json.dumps(cam),
+                cam_docx_path = cam.get("docx_path"),
+                cam_pdf_path  = cam.get("pdf_path"),
+                pipeline_stage= "complete",
+                status        = "cam_ready",
+            )
+            log_stage(case_id, "cam_generation", "complete",
+                      f"CAM generated. Decision: {cam.get('decision')} | "
+                      f"Score: {cam.get('composite_score')}/100 | "
+                      f"Amount: {cam.get('recommended_amount_inr',0)/1e7:.1f} Cr")
+        except Exception as cam_err:
+            # Graceful degradation — run old basic CAM if engine fails
+            log_stage(case_id, "cam_generation", "warning",
+                      f"CAM engine error: {str(cam_err)[:300]}. Falling back to basic CAM.")
+            cam = build_cam(case_id, extraction_data, research_data, research_payload)
+            update_case_field(
+                case_id,
+                cam_json      = json.dumps(cam),
+                pipeline_stage= "complete",
+                status        = "cam_ready",
+            )
+            log_stage(case_id, "cam_generation", "complete", f"Basic CAM. Decision: {cam.get('decision')}")
 
     except subprocess.TimeoutExpired:
         update_case_field(case_id, pipeline_stage="error", status="error")
@@ -708,6 +768,8 @@ async def start_pipeline(
 
     # Build research payload
     promoters = json.loads(row.get("promoters_json") or "[]")
+    qualitative = json.loads(row.get("qualitative_json") or "{}")
+
     research_payload = {
         "case_id":           case_id,
         "company_name":      row["company_name"],
@@ -729,6 +791,7 @@ async def start_pipeline(
             "purpose":     row.get("purpose", ""),
         },
         "ingestion_version": "2.0.0",
+        "qualitative":       qualitative,   # primary insight fields from credit officer
     }
 
     update_case_field(case_id, status="processing", pipeline_stage="starting")
@@ -807,6 +870,108 @@ async def get_cam(case_id: str, user=Depends(get_current_user)):
     return json.loads(row["cam_json"])
 
 
+@app.get("/cases/{case_id}/cam/download")
+async def download_cam(
+    case_id: str,
+    fmt: str = "pdf",
+    user=Depends(get_current_user),
+):
+    """
+    Download the generated CAM document as PDF or DOCX.
+    ?fmt=pdf  (default) or ?fmt=docx
+    """
+    conn = get_db()
+    row  = conn.execute(
+        "SELECT cam_docx_path, cam_pdf_path, company_name FROM cases WHERE id=?",
+        (case_id,)
+    ).fetchone()
+    conn.close()
+
+    if not row:
+        raise HTTPException(status_code=404, detail="Case not found")
+
+    if fmt == "docx":
+        file_path = row["cam_docx_path"]
+        media_type= "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        suffix    = ".docx"
+    else:
+        file_path = row["cam_pdf_path"] or row["cam_docx_path"]
+        media_type= "application/pdf"
+        suffix    = ".pdf"
+
+    if not file_path or not Path(file_path).exists():
+        raise HTTPException(
+            status_code=404,
+            detail=f"CAM {fmt.upper()} file not found. Run the pipeline first."
+        )
+
+    filename = f"CAM_{case_id}_{row['company_name'].replace(' ','_')[:30]}{suffix}"
+    return FileResponse(
+        path       = file_path,
+        media_type = media_type,
+        filename   = filename,
+    )
+
+
+@app.patch("/cases/{case_id}/primary-insight")
+async def save_primary_insight(
+    case_id: str,
+    req: PrimaryInsightRequest,
+    user=Depends(require_manager),
+):
+    """
+    Save credit officer primary insight / field observations for a case.
+    These directly adjust the composite credit score (+/- up to 15 pts).
+    Must be saved BEFORE calling /cases/{case_id}/start.
+    """
+    conn = get_db()
+    row  = conn.execute("SELECT id, qualitative_json FROM cases WHERE id=?", (case_id,)).fetchone()
+    conn.close()
+    if not row:
+        raise HTTPException(status_code=404, detail="Case not found")
+
+    # Merge with existing qualitative data (if any)
+    existing = {}
+    if row["qualitative_json"]:
+        try:
+            existing = json.loads(row["qualitative_json"])
+        except Exception:
+            pass
+
+    # Apply only provided (non-None) fields
+    update = req.model_dump(exclude_none=True)
+    merged = {**existing, **update}
+
+    update_case_field(case_id, qualitative_json=json.dumps(merged))
+    log_stage(case_id, "primary_insight", "saved",
+              f"Credit officer field observations saved: {list(update.keys())}")
+
+    return {
+        "message":    "Primary insight saved successfully",
+        "fields_saved": list(update.keys()),
+        "qualitative": merged,
+    }
+
+
+@app.get("/cases/{case_id}/primary-insight")
+async def get_primary_insight(case_id: str, user=Depends(get_current_user)):
+    """Retrieve the saved primary insight fields for a case."""
+    conn = get_db()
+    row  = conn.execute("SELECT qualitative_json FROM cases WHERE id=?", (case_id,)).fetchone()
+    conn.close()
+    if not row:
+        raise HTTPException(status_code=404, detail="Case not found")
+
+    qualitative = {}
+    if row["qualitative_json"]:
+        try:
+            qualitative = json.loads(row["qualitative_json"])
+        except Exception:
+            pass
+
+    return {"qualitative": qualitative, "has_field_data": bool(qualitative)}
+
+
 @app.post("/cases/{case_id}/send-to-approver")
 async def send_to_approver(case_id: str, user=Depends(require_manager)):
     conn = get_db()
@@ -858,21 +1023,29 @@ def _format_case(row: dict) -> dict:
             cam = json.loads(row["cam_json"])
         except Exception:
             pass
+    # Support both old (recommended_limit) and new (recommended_amount_inr) cam_json schemas
+    rec_limit = cam.get("recommended_limit") or cam.get("recommended_amount_inr")
+    risk_color= cam.get("decision_color") or cam.get("risk_band", "AMBER")
+    has_doc   = bool(row.get("cam_pdf_path") or row.get("cam_docx_path"))
+
     return {
         "id":              row["id"],
         "company_name":    row["company_name"],
         "status":          row["status"],
         "pipeline_stage":  row.get("pipeline_stage", "created"),
-        "risk_color":      cam.get("decision_color", "AMBER"),
+        "risk_color":      risk_color,
+        "risk_band":       cam.get("risk_band", "AMBER"),
         "decision":        cam.get("decision"),
         "loan_amount":     row.get("loan_amount"),
         "loan_type":       row.get("loan_type"),
         "industry":        row.get("industry"),
-        "recommended_limit": cam.get("recommended_limit"),
-        "composite_score": cam.get("composite_score"),
-        "created_at":      row.get("created_at"),
-        "updated_at":      row.get("updated_at"),
-        "created_by":      row.get("created_by"),
+        "recommended_limit":  rec_limit,
+        "composite_score":    cam.get("composite_score"),
+        "interest_rate":      cam.get("interest_rate"),
+        "has_cam_document":   has_doc,
+        "created_at":         row.get("created_at"),
+        "updated_at":         row.get("updated_at"),
+        "created_by":         row.get("created_by"),
     }
 
 

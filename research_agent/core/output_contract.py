@@ -43,6 +43,7 @@ class DataSource(str, Enum):
     ECOURTS  = "ECOURTS"    # eCourts.gov.in
     NEWS     = "NEWS"       # Tavily AI news search
     GSTN     = "GSTN"       # GSTIN portal
+    CIBIL    = "CIBIL"      # CIBIL Commercial Bureau (India credit bureau)
     INTERNAL = "INTERNAL"   # System-generated
 
 

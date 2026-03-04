@@ -191,6 +191,62 @@ export default function CAMViewerPage() {
                     <p className={styles.decisionSummary}>&ldquo;{cam.decision_summary}&rdquo;</p>
                 </div>
 
+                {/* Decision Rationale (new 8th section) */}
+                {(cam as any).decision_rationale && (
+                    <div className={styles.section}>
+                        <div className={styles.sectionTitle}>📋 Decision Rationale — Cross-Pillar Explanation</div>
+                        <div className={styles.rationaleBox}>
+                            <div className={styles.rationaleTag}>AI-Generated · Cross-Pillar Analysis · 3 Pillars</div>
+                            <div className={styles.rationaleText}>{(cam as any).decision_rationale}</div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Cross-pillar contradictions */}
+                {(cam as any).cross_pillar_contradictions?.length > 0 && (
+                    <div className={styles.section}>
+                        <div className={styles.sectionTitleRow}>
+                            <div className={styles.sectionTitle}>🔀 Cross-Pillar Contradictions</div>
+                            <span className={styles.contradictionBadge}>
+                                {(cam as any).cross_pillar_contradictions.length} detected
+                            </span>
+                        </div>
+                        <div className={styles.contradictionList}>
+                            {(cam as any).cross_pillar_contradictions.map((c: string, i: number) => (
+                                <div key={i} className={styles.contradictionItem}>
+                                    <span className={styles.contradictionIcon}>⚠️</span>
+                                    <span>{c}</span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {/* Primary Insight (Qualitative) Adjustment */}
+                {((cam as any).qualitative_adjustment !== 0 && (cam as any).qualitative_adjustment !== undefined) && (
+                    <div className={styles.section}>
+                        <div className={styles.sectionTitle}>🏭 Primary Insight Score Adjustment</div>
+                        <div className={styles.qualCard}>
+                            <div className={styles.qualDelta}>
+                                <span className={`${styles.qualDeltaNum} ${(cam as any).qualitative_adjustment > 0 ? styles.qualPos : styles.qualNeg
+                                    }`}>
+                                    {(cam as any).qualitative_adjustment > 0 ? '+' : ''}{(cam as any).qualitative_adjustment} pts
+                                </span>
+                                <span className={styles.qualDeltaLabel}>
+                                    applied to composite score from field observations
+                                </span>
+                            </div>
+                            {(cam as any).qualitative_explanations?.length > 0 && (
+                                <ul className={styles.qualList}>
+                                    {(cam as any).qualitative_explanations.map((e: string, i: number) => (
+                                        <li key={i} className={styles.qualItem}>{e}</li>
+                                    ))}
+                                </ul>
+                            )}
+                        </div>
+                    </div>
+                )}
+
                 {/* Five Cs */}
                 <div className={styles.section}>
                     <div className={styles.sectionTitle}>📊 Five Cs Scorecard</div>

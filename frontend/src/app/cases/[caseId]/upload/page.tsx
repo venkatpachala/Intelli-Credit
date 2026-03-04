@@ -13,7 +13,8 @@ const MANDATORY_DOCS: Omit<DocSlot, 'files'>[] = [
     { id: 'bank_statements', label: 'Bank Statements (12 Months)', hint: 'CC / Current account statements', required: true },
     { id: 'itr', label: 'ITR + Computation (Last 2 Years)', hint: 'ITR FY24, FY23 with CA computation', required: true },
     { id: 'gst_returns', label: 'GST Returns — GSTR-3B (12M)', hint: 'Monthly GSTR-3B for 12 months', required: true },
-    { id: 'cibil', label: 'CIBIL Commercial Report (CMR)', hint: 'Latest CIBIL CMR report', required: true },
+    { id: 'gstr2a', label: 'GST Returns — GSTR-2A (12M)', hint: 'GSTR-2A purchase register — used for CV_011 ITC reconciliation', required: false },
+    { id: 'cibil', label: 'CIBIL Commercial Report (CMR)', hint: 'Latest CIBIL CMR report (for CIBIL Source 6)', required: false },
 ];
 
 const OPTIONAL_DOCS = [
@@ -82,7 +83,22 @@ export default function UploadPage() {
                         <div className={`mono ${styles.caseLabel}`}>{caseId}</div>
                         <h1 className={styles.pageTitle}>Upload Documents</h1>
                     </div>
-                    <div className={styles.stepBadge}>Step 2 of 4 — Upload Documents</div>
+                    <div className={styles.stepBadge}>Step 3 of 4 — Upload Documents</div>
+                </div>
+
+                {/* Primary Insight Banner */}
+                <div className={styles.insightBanner}>
+                    <span className={styles.insightBannerIcon}>🏭</span>
+                    <div className={styles.insightBannerText}>
+                        <strong>Add Field Observations (Primary Insight)</strong> to let credit officer notes
+                        adjust the AI composite score by up to ±15 points.
+                    </div>
+                    <a
+                        href={`/cases/${caseId}/insights`}
+                        className={styles.insightBannerBtn}
+                    >
+                        Open Field Insights &rarr;
+                    </a>
                 </div>
 
                 {/* Progress bar */}
