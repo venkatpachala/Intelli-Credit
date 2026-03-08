@@ -70,12 +70,10 @@ class CAMBuilder:
 
     def build(self, data: Dict) -> Document:
         """
-        Restructures the CAM to match the IDFC First Bank 'Grid-Intensive' layout.
+        Build a bank-style CAM layout aligned to standard Indian credit memo formats.
         """
-        # IDFC Style Header (Maroon Logo + Bank Name)
-        self._add_idfc_header()
-
-        # Section 1: Application & Loan Details (Grid Block)
+        # Cover + borrower/sanction snapshot
+        self._add_cover_page(data)
         self._add_idfc_application_details(data)
         self._add_idfc_loan_details(data)
 
@@ -96,6 +94,7 @@ class CAMBuilder:
 
         # Section 7: Collateral & GST Intelligence
         self._add_section6_collateral(data)
+        self._add_section7_conditions(data)
         self._add_section7a_gst_intelligence(data)
 
         # Section 8: Risk Matrix & Deviations
@@ -109,6 +108,35 @@ class CAMBuilder:
 
         self._add_footer(data)
         return self.doc
+
+    def _add_cover_page(self, d: Dict):
+        """Conservative bank-style CAM title page."""
+        p = self.doc.add_paragraph()
+        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        run = p.add_run("CREDIT APPRAISAL MEMORANDUM")
+        run.bold = True
+        run.font.size = Pt(18)
+        run.font.color.rgb = Colors.IDFC_MAROON
+
+        p2 = self.doc.add_paragraph()
+        p2.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        company = d.get("company_name", "Borrower")
+        p2.add_run(f"Borrower: {company}").bold = True
+
+        p3 = self.doc.add_paragraph()
+        p3.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        p3.add_run(f"Date: {datetime.now().strftime('%d-%b-%Y')}")
+
+        self.doc.add_paragraph()
+        self._add_decision_box(
+            d.get("decision", "PENDING"),
+            _safe(d.get("recommended_amount_inr", 0)) / 1e7,
+            _safe(d.get("requested_amount_inr", 0)) / 1e7,
+            _safe(d.get("interest_rate", 0)),
+            int(_safe(d.get("composite_score", 0))),
+            d.get("risk_band", "AMBER"),
+        )
+        self.doc.add_page_break()
 
     # ─────────────────────────────────────────────────────────
     # COVER PAGE
@@ -146,22 +174,34 @@ class CAMBuilder:
         self._add_divider(Colors.IDFC_MAROON)
 
     def _add_idfc_application_details(self, d: Dict):
-        self._add_idfc_section_title("Application Details")
+        self._add_idfc_section_title("Borrower & Application Details")
         case_id = d.get("case_id", "—")
         now = datetime.now().strftime("%d-%b-%Y")
 
-        # 8-column header grid
-        headers = ["LAN", "Branch", "Application Name", "QDE Login Date", "Scheme Group", "Scheme", "Banking Status", "Financial Status"]
-        data    = [case_id, "Corporate HQ", d.get("company_name", "—"), now, "SME Credit", "Corporate Term Loan", "Active", "Verified"]
+        headers = [
+            "CAM Ref.", "Branch", "Borrower Name", "Appraisal Date",
+            "Industry", "Constitution", "CIN", "GSTIN"
+        ]
+        profile = d.get("company_profile", {})
+        data = [
+            case_id,
+            "Corporate Credit",
+            d.get("company_name", "—"),
+            now,
+            d.get("industry", "—"),
+            profile.get("constitution", "Company") if isinstance(profile, dict) else "Company",
+            d.get("cin", "—"),
+            d.get("gstin", "—"),
+        ]
         self._add_horizontal_data_table(headers, data)
 
     def _add_idfc_loan_details(self, d: Dict):
-        self._add_idfc_section_title("Loan Details")
+        self._add_idfc_section_title("Sanction Terms (Proposed)")
 
         low_score = d.get("composite_score", 0) < 50
         tier = "Non-Prime" if low_score else "Prime"
 
-        headers = ["Requested Loan Amount", "Loan Amount Approved", "Tenure", "Interest Rate", "Loan Purpose", "GSTIN", "Customer Tier", "Loan Type"]
+        headers = ["Requested Amount", "Recommended Amount", "Tenor", "Interest Rate", "Purpose", "Risk Band", "Customer Tier", "Facility Type"]
         req = _safe(d.get("requested_amount_inr", 0)) / 1e5
         rec = _safe(d.get("recommended_amount_inr", 0)) / 1e5
         tenor = d.get("loan_details", {}).get("tenor_months", 36)
@@ -172,10 +212,10 @@ class CAMBuilder:
             f"Rs. {rec:.2f} Lakh",
             f"{tenor} Months",
             f"{rate:.2f}% p.a.",
-            d.get("loan_type", "Working Capital"),
-            d.get("gstin", "—"),
+            d.get("loan_details", {}).get("purpose", "Working Capital") if isinstance(d.get("loan_details"), dict) else "Working Capital",
+            d.get("risk_band", "AMBER"),
             tier,
-            "Term Loan"
+            d.get("loan_type", "Term Loan")
         ]
         self._add_horizontal_data_table(headers, data)
 
