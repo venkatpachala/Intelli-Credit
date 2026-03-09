@@ -33,6 +33,18 @@ def _safe(v, fallback=0.0):
     except: return fallback
 
 
+def _safe_flag_list(v) -> list:
+    """Return v as a list of dicts. Handles int/None (old basic cam) or list (new cam engine)."""
+    if not v:
+        return []
+    if isinstance(v, (int, float)):
+        # Old basic cam format: stored just a count integer — no detail available
+        return []
+    if isinstance(v, list):
+        return v
+    return []
+
+
 class CAMBuilder:
     """
     Builds the Credit Appraisal Memorandum as a python-docx Document.
@@ -329,8 +341,8 @@ class CAMBuilder:
         self.doc.add_paragraph()
 
         # Research flags table (character-related)
-        char_flags = [f for f in d.get("research_flags", [])
-                      if f.get("category") in ("PROMOTER","FRAUD","LITIGATION")]
+        char_flags = [f for f in _safe_flag_list(d.get("research_flags", []))
+                      if isinstance(f, dict) and f.get("category") in ("PROMOTER","FRAUD","LITIGATION")]
         if char_flags:
             self._add_sub_heading("Research Findings — Character Flags")
             self._add_flags_table(char_flags)
@@ -747,17 +759,18 @@ class CAMBuilder:
     def _add_section8_risk_matrix(self, d: Dict):
         self._add_section_heading("8", "RISK MATRIX")
 
-        all_flags = d.get("research_flags", [])
-        ext_flags = d.get("extraction_flags", [])  # from extractor risk_flags
+        all_flags = _safe_flag_list(d.get("research_flags", []))
+        ext_flags = _safe_flag_list(d.get("extraction_flags", []))  # from extractor risk_flags
 
         combined = []
         for f in all_flags:
-            combined.append({
-                "severity": f.get("severity", "MEDIUM"),
-                "title":    f.get("title", f.get("description", str(f))),
-                "source":   f.get("source", "Research Agent"),
-                "mitigant": _default_mitigant_str(f),
-            })
+            if isinstance(f, dict):
+                combined.append({
+                    "severity": f.get("severity", "MEDIUM"),
+                    "title":    f.get("title", f.get("description", str(f))),
+                    "source":   f.get("source", "Research Agent"),
+                    "mitigant": _default_mitigant_str(f),
+                })
         for f in ext_flags:
             if isinstance(f, dict):
                 combined.append({

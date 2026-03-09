@@ -870,6 +870,36 @@ async def get_cam(case_id: str, user=Depends(get_current_user)):
     return json.loads(row["cam_json"])
 
 
+def generate_cam_documents(case_id: str, cam_data: dict, company_name: str):
+    """
+    Build DOCX + PDF from an existing cam_data dict.
+    Used to regenerate files for cases where docx/pdf paths are missing.
+    Returns (docx_path, pdf_path).
+    """
+    cam_engine_path = str(CAM_ENGINE_DIR)
+    if cam_engine_path not in sys.path:
+        sys.path.insert(0, cam_engine_path)
+
+    from document.builder import CAMBuilder
+    from document.pdf_converter import convert_to_pdf
+
+    case_output_dir = CAM_OUTPUT_DIR / case_id
+    case_output_dir.mkdir(parents=True, exist_ok=True)
+
+    ts        = datetime.now().strftime("%Y%m%d_%H%M%S")
+    docx_path = str(case_output_dir / f"CAM_{case_id}_{ts}.docx")
+
+    builder = CAMBuilder()
+    doc     = builder.build(cam_data)
+    doc.save(docx_path)
+
+    pdf_path   = docx_path.replace(".docx", ".pdf")
+    pdf_result = convert_to_pdf(docx_path, pdf_path)
+    final_pdf  = pdf_result if (pdf_result and Path(pdf_result).exists()) else docx_path
+
+    return docx_path, final_pdf
+
+
 @app.get("/cases/{case_id}/cam/download")
 async def download_cam(
     case_id: str,
@@ -882,7 +912,7 @@ async def download_cam(
     """
     conn = get_db()
     row  = conn.execute(
-        "SELECT cam_docx_path, cam_pdf_path, company_name FROM cases WHERE id=?",
+        "SELECT cam_docx_path, cam_pdf_path, company_name, cam_json FROM cases WHERE id=?",
         (case_id,)
     ).fetchone()
     conn.close()
@@ -890,20 +920,52 @@ async def download_cam(
     if not row:
         raise HTTPException(status_code=404, detail="Case not found")
 
+    file_path = None
+    media_type = None
+    suffix = None
+
     if fmt == "docx":
         file_path = row["cam_docx_path"]
         media_type= "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
         suffix    = ".docx"
-    else:
-        file_path = row["cam_pdf_path"] or row["cam_docx_path"]
+    else: # default to pdf
+        file_path = row["cam_pdf_path"]
         media_type= "application/pdf"
         suffix    = ".pdf"
 
+    # Check if file exists, if not, try to regenerate
     if not file_path or not Path(file_path).exists():
-        raise HTTPException(
-            status_code=404,
-            detail=f"CAM {fmt.upper()} file not found. Run the pipeline first."
-        )
+        if not row["cam_json"]:
+            raise HTTPException(
+                status_code=404,
+                detail=f"CAM {fmt.upper()} file not found and CAM JSON is missing. Run the pipeline first."
+            )
+        
+        log_stage(case_id, "cam_download", "regenerating", f"CAM {fmt.upper()} file not found, regenerating from CAM JSON.")
+        
+        # Regenerate CAM documents
+        cam_data = json.loads(row["cam_json"])
+        docx_path, pdf_path = generate_cam_documents(case_id, cam_data, row["company_name"])
+        
+        # Update database with new paths
+        update_case_field(case_id, cam_docx_path=docx_path, cam_pdf_path=pdf_path)
+
+        # Update row with new paths for immediate use
+        row = dict(row) # Convert to dict to allow modification
+        row["cam_docx_path"] = docx_path
+        row["cam_pdf_path"] = pdf_path
+
+        # Re-evaluate file_path based on regenerated paths
+        if fmt == "docx":
+            file_path = row["cam_docx_path"]
+        else:
+            file_path = row["cam_pdf_path"]
+
+        if not file_path or not Path(file_path).exists():
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to regenerate CAM {fmt.upper()} file."
+            )
 
     filename = f"CAM_{case_id}_{row['company_name'].replace(' ','_')[:30]}{suffix}"
     return FileResponse(
